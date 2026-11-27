@@ -38,14 +38,21 @@ struct Config: Decodable {
         directory.appendingPathComponent("claudebar.sock").path
     }
 
-    static func load() -> Config {
-        let url = directory.appendingPathComponent("config.json")
-        guard let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(Config.self, from: data)
-        else {
-            return Config()
+    static var fileURL: URL {
+        directory.appendingPathComponent("config.json")
+    }
+
+    /// Loads config.json, falling back to defaults. A file that exists but
+    /// doesn't parse is reported back rather than silently ignored.
+    static func load() -> (config: Config, error: String?) {
+        guard let data = try? Data(contentsOf: fileURL) else {
+            return (Config(), nil)
         }
-        return config
+        do {
+            return (try JSONDecoder().decode(Config.self, from: data), nil)
+        } catch {
+            return (Config(), "config.json couldn't be read — using defaults")
+        }
     }
 
     // Let people omit keys they don't care about in config.json.

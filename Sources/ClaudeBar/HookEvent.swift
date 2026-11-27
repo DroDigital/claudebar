@@ -12,6 +12,9 @@ struct HookEvent: Decodable {
     /// Present on Notification events, e.g.
     /// "Claude needs your permission to use Bash".
     let message: String?
+    /// Present on Notification events in recent Claude Code versions, e.g.
+    /// "permission_prompt" or "idle_prompt".
+    let notificationType: String?
 
     enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
@@ -19,10 +22,16 @@ struct HookEvent: Decodable {
         case transcriptPath = "transcript_path"
         case cwd
         case message
+        case notificationType = "notification_type"
     }
 
     var isPermissionRequest: Bool {
-        hookEventName == "Notification" &&
-            (message?.localizedCaseInsensitiveContains("permission") ?? false)
+        guard hookEventName == "Notification" else { return false }
+        // Prefer the structured field; fall back to the message text on
+        // older Claude Code versions that don't send it.
+        if let type = notificationType {
+            return type == "permission_prompt"
+        }
+        return message?.localizedCaseInsensitiveContains("permission") ?? false
     }
 }
