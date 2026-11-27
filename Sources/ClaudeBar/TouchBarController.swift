@@ -14,11 +14,22 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         case permission(message: String)
     }
 
-    private let config: Config
+    private var config: Config
     private let usageTracker: UsageTracker
     private var presentedBar: NSTouchBar?
     private var mode: Mode = .idle
     private var usageLabel: NSTextField?
+    private weak var glyph: ClaudeGlyphView?
+
+    /// Called after a permission button was tapped, so whoever owns the
+    /// session state can forget the prompt it was showing.
+    var onPermissionAnswered: (() -> Void)?
+
+    /// Whether Claude is mid-turn. Drives the starburst's breathing; it
+    /// never re-presents the bar, so flipping it can't cause flicker.
+    var isWorking = false {
+        didSet { glyph?.isAnimating = isWorking }
+    }
 
     init(config: Config, usageTracker: UsageTracker) {
         self.config = config
@@ -30,6 +41,15 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
     }
 
     // MARK: - Presenting
+
+    /// Swap in a freshly loaded config, rebuilding the bar if it's up.
+    func apply(_ config: Config) {
+        self.config = config
+        guard presentedBar != nil else { return }
+        let current = mode
+        dismiss()
+        show(current)
+    }
 
     func show(_ mode: Mode) {
         // Re-presenting an identical bar makes it flicker; skip if unchanged.
@@ -76,7 +96,10 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
 
         case .claudeGlyph:
             let item = NSCustomTouchBarItem(identifier: identifier)
-            item.view = ClaudeGlyphView(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
+            let view = ClaudeGlyphView(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
+            view.isAnimating = isWorking
+            glyph = view
+            item.view = view
             return item
 
         case .usage:
@@ -157,17 +180,22 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
 
     @objc private func allowOnce() {
         KeySender.type("1")
-        show(.idle)
+        permissionAnswered()
     }
 
     @objc private func alwaysAllow() {
         KeySender.type("2")
-        show(.idle)
+        permissionAnswered()
     }
 
     @objc private func reject() {
         KeySender.tap(KeySender.escape)
+        permissionAnswered()
+    }
+
+    private func permissionAnswered() {
         show(.idle)
+        onPermissionAnswered?()
     }
 }
 

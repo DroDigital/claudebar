@@ -3,7 +3,7 @@ BUNDLE = build/$(APP).app
 BINARY = build/$(APP)
 SOURCES = $(wildcard Sources/ClaudeBar/*.swift)
 
-.PHONY: all build bundle install clean
+.PHONY: all build bundle install uninstall clean
 
 all: bundle
 
@@ -26,6 +26,9 @@ bundle: build
 
 install: bundle
 	./install.sh
+
+uninstall:
+	./uninstall.sh
 
 clean:
 	rm -rf .build build
